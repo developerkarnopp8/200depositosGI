@@ -42,7 +42,7 @@ function closeModal() {
   modalMode.value = 'create'
 }
 
-function confirm(payload: { id: number; amount: number; date: string; note: string }) {
+function handleConfirm(payload: { id: number; amount: number; date: string; note: string }) {
   store.confirmDeposit(payload.id, payload.amount, payload.date || todayISO(), payload.note)
   showToast('Depósito confirmado!')
   closeModal()
@@ -73,7 +73,7 @@ function undo(id: number) {
       :item="modalItem"
       :mode="modalMode"
       @close="closeModal"
-      @confirm="confirm"
+      @confirm="handleConfirm"
       @update="update"
       @undo="undo"
       @setMode="(m) => (modalMode = m)"
