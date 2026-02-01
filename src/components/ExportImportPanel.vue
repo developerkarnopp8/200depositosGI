@@ -5,6 +5,8 @@ import { useDepositsStore } from '../store/deposits'
 const store = useDepositsStore()
 const resetText = ref('')
 const importError = ref<string | null>(null)
+const token = ref('')
+const gistId = ref<string | null>(store.getGistId())
 
 function download(filename: string, text: string) {
   const a = document.createElement('a')
@@ -46,6 +48,27 @@ function onReset() {
   resetText.value = ''
   alert('Desafio resetado.')
 }
+
+async function onPushGist() {
+  try {
+    const id = await store.pushToGist(token.value)
+    gistId.value = id
+    alert('Sincronizado com sucesso. Gist ID: ' + id + '\nGuarde este ID para restaurar em outro dispositivo.')
+  } catch (err: any) {
+    alert('Erro ao sincronizar: ' + (err?.message || err))
+  }
+}
+
+async function onPullGist() {
+  try {
+    const idPrompt = prompt('Informe o Gist ID (deixe vazio para usar salvo)') || undefined
+    const id = await store.pullFromGist(idPrompt)
+    gistId.value = id
+    alert('Estado importado do Gist: ' + id)
+  } catch (err: any) {
+    alert('Erro ao importar do Gist: ' + (err?.message || err))
+  }
+}
 </script>
 
 <template>
@@ -81,6 +104,24 @@ function onReset() {
           <input class="input" v-model="resetText" placeholder="RESETAR" />
         </div>
         <button class="btn danger" @click="onReset">Resetar desafio</button>
+      </div>
+    </div>
+
+    <div style="height: 12px;"></div>
+    <div style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px;">
+      <div style="font-weight: 900;">Sincronizar via GitHub Gist</div>
+      <div class="muted" style="font-size: 12px; margin-top: 6px;">
+        Você pode sincronizar o estado criando/atualizando um Gist privado. Crie um Personal Access Token (scope <b>gist</b>) e cole abaixo.
+      </div>
+
+      <div style="margin-top: 10px; display:flex; gap:8px; align-items:center;">
+        <input class="input" v-model="token" placeholder="GitHub Personal Access Token (scope: gist)" />
+        <button class="btn" @click="onPushGist">Salvar no Gist</button>
+        <button class="btn" @click="onPullGist">Carregar do Gist</button>
+      </div>
+
+      <div class="muted" style="font-size: 12px; margin-top: 8px;">
+        Gist salvo: <strong v-if="gistId">{{ gistId }}</strong><span v-else>nenhum</span>
       </div>
     </div>
   </section>

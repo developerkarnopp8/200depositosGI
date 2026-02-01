@@ -3,6 +3,7 @@ import type { AppState, DepositItem } from '../types'
 import { clamp } from '../utils/format'
 
 const STORAGE_KEY = 'desafio-200-depositos:v1'
+const GIST_KEY = 'desafio-200-depositos:gist'
 
 function createInitialDeposits(): DepositItem[] {
   return Array.from({ length: 200 }, (_, i) => ({
@@ -158,5 +159,61 @@ export const useDepositsStore = defineStore('deposits', {
       this.deposits = parsed.deposits
       this.persist()
     },
+
+    async pushToGist(token: string) {
+      if (!token) throw new Error('Token do GitHub é necessário (com scope `gist`)')
+      const payload = this.exportJSON()
+      const existing = localStorage.getItem(GIST_KEY)
+      const body = {
+        files: {
+          'desafio-200-depositos.json': { content: payload }
+        },
+        public: false,
+        description: 'Desafio dos 200 Depósitos - estado sincronizado'
+      }
+      const headers: Record<string,string> = {
+        Authorization: `token ${token}`,
+        'Content-Type': 'application/json'
+      }
+
+      let res: Response
+      if (existing) {
+        res = await fetch(`https://api.github.com/gists/${existing}`, { method: 'PATCH', headers, body: JSON.stringify(body) })
+      } else {
+        res = await fetch('https://api.github.com/gists', { method: 'POST', headers, body: JSON.stringify(body) })
+      }
+
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(`Falha no Gist: ${res.status} ${text}`)
+      }
+
+      const data = await res.json()
+      if (data && data.id) {
+        localStorage.setItem(GIST_KEY, data.id)
+        return data.id
+      }
+      throw new Error('Resposta inesperada do Gist')
+    },
+
+    async pullFromGist(gistId?: string) {
+      const id = gistId || localStorage.getItem(GIST_KEY)
+      if (!id) throw new Error('Gist ID não encontrado. Sincronize primeiro ou informe um ID.')
+      const res = await fetch(`https://api.github.com/gists/${id}`)
+      if (!res.ok) throw new Error('Falha ao buscar Gist: ' + res.statusText)
+      const data = await res.json()
+      const filenames = Object.keys(data.files || {})
+      if (!filenames.length) throw new Error('Gist não contém arquivos')
+      // prefer the known filename if present
+      const fileName = filenames.includes('desafio-200-depositos.json') ? 'desafio-200-depositos.json' : filenames[0]
+      const content = data.files[fileName]?.content
+      if (!content) throw new Error('Conteúdo do Gist inválido')
+      this.importJSON(content)
+      return id
+    },
+
+    getGistId() {
+      return localStorage.getItem(GIST_KEY)
+    }
   },
 })
